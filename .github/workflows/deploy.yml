@@ -3,7 +3,10 @@ name: Deploy Flutter Web App to GitHub Pages
 on:
   push:
     branches:
-      - main   # change if your default branch is different
+      - main   # your default branch
+
+permissions:
+  contents: write   # ✅ allow Actions to push to gh-pages
 
 jobs:
   build:
@@ -16,7 +19,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.1'   # ✅ includes Dart 3.7.2
+          flutter-version: '3.35.1'
 
       - name: Enable Flutter Web
         run: flutter config --enable-web
