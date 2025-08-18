@@ -1,37 +1,66 @@
-name: Deploy Flutter Web App to GitHub Pages
+name: Deploy Flutter Web to GitHub Pages
 
 on:
   push:
-    branches:
-      - main   # your default branch
+    branches: [ "main" ]   # Deploy only when pushing to main
+  workflow_dispatch:
 
 permissions:
-  contents: write   # ✅ allow Actions to push to gh-pages
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.1'
+          channel: stable
+          flutter-version: 3.27.1   # ✅ Make sure Dart >= 3.7.2
+          cache: true
 
-      - name: Enable Flutter Web
+      - name: Enable Flutter web
         run: flutter config --enable-web
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Decide base href for GitHub Pages
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          if [[ "$REPO_NAME" == *.github.io ]]; then
+            echo "BASE_HREF=/" >> $GITHUB_ENV
+          else
+            echo "BASE_HREF=/$REPO_NAME/" >> $GITHUB_ENV
+          fi
+
       - name: Build Flutter Web
-        run: flutter build web --release --base-href=/
+        run: flutter build web --release --base-href "$BASE_HREF"
+
+      - name: Support SPA routing (404.html = index.html)
+        run: cp build/web/index.html build/web/404.html
+
+      - name: Add CNAME for custom domain (if provided)
+        env:
+          CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}
+        run: |
+          if [[ -n "$CUSTOM_DOMAIN" ]]; then
+            echo "$CUSTOM_DOMAIN" > build/web/CNAME
+            echo "CNAME created for $CUSTOM_DOMAIN"
+          else
+            echo "No CUSTOM_DOMAIN provided; skipping CNAME"
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build/web
+          publish_branch: gh-pages
+          force_orphan: true
