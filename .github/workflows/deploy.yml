@@ -21,6 +21,7 @@ jobs:
           channel: stable
           cache: true
 
+      # Enable web support (safe to keep, even if already enabled)
       - name: Enable Flutter web
         run: flutter config --enable-web
 
@@ -46,6 +47,7 @@ jobs:
       - name: Build web
         run: flutter build web --release --base-href "$BASE_HREF"
 
+      # Fix refresh issues in Flutter web (Single Page App support)
       - name: Support SPA routing on refresh
         run: cp build/web/index.html build/web/404.html
 
@@ -67,5 +69,3 @@ jobs:
           publish_dir: ./build/web
           publish_branch: gh-pages
           force_orphan: true
-
-
