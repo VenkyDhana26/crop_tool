@@ -3,7 +3,10 @@ name: Flutter Web Deploy
 on:
   push:
     branches:
-      - main   # Runs workflow when you push to main branch
+      - main   # or your default branch
+
+permissions:
+  contents: write   # 👈 allow Actions to push to gh-pages branch
 
 jobs:
   build:
