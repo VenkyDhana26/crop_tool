@@ -528,6 +528,7 @@ class CropController extends GetxController {
         int duration = 0;
         double cropHeight = 0.0;
         double kcb = 0.0;
+        double rootzoneDepth = 0.0;
 
         for (int j = 0; j < parsedData.length; j++) {
           final row = parsedData[j];
@@ -548,6 +549,7 @@ class CropController extends GetxController {
             if (isMatch) {
               duration = int.tryParse(row[1].trim()) ?? 0;
               cropHeight = double.tryParse(row[2].trim()) ?? 0.0;
+              rootzoneDepth = double.tryParse(row[4].trim()) ?? 0.0;
 
               // Get kcb value from the kcb column if it exists
               if (kcbColumnIndex >= 0 && kcbColumnIndex < row.length) {
@@ -562,6 +564,10 @@ class CropController extends GetxController {
         }
 
         double kc = calculateKc(kcb, cropHeight);
+        
+        // Default rootzone depth values for each stage (in cm)
+        
+       
         newData.add(
           CropStageData(
             stage: stage,
@@ -569,6 +575,7 @@ class CropController extends GetxController {
             cropHeight: cropHeight,
             kcbValue: kcb,
             kc: kc,
+            rootzoneDepth: rootzoneDepth,
           ),
         );
       }
