@@ -200,9 +200,39 @@ class CropWaterRequirementView extends GetView<CropWaterRequirementController> {
                 ),
                 Expanded(
                   child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: Colors.grey, width: 0.5),
+                      ),
+                    ),
                     padding: EdgeInsets.all(8.0),
                     child: Text(
-                      'IRR (mm/day)',
+                      'Depletion End (mm)',
+                      textAlign: TextAlign.center,
+                      style: columnHeaderStyle,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: Colors.grey, width: 0.5),
+                      ),
+                    ),
+                    padding: EdgeInsets.all(8.0),
+                    child: Text(
+                      'Net Irrigation Depth (mm)',
+                      textAlign: TextAlign.center,
+                      style: columnHeaderStyle,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text(
+                      'Gross Irrigation Depth (mm)',
                       textAlign: TextAlign.center,
                       style: columnHeaderStyle,
                     ),
@@ -263,8 +293,13 @@ class CropWaterRequirementView extends GetView<CropWaterRequirementController> {
         }
         // IRR (mm/day) from controller = ETc - Effective rainfall
         String irrValue = '';
-        if (globalRowIndex < controller.irrValues.length) {
-          irrValue = controller.irrValues[globalRowIndex];
+        if (globalRowIndex < controller.netIrrigationValues.length) {
+          irrValue = controller.netIrrigationValues[globalRowIndex];
+        }
+        // Gross Irrigation Depth (mm/day) from controller
+        String grossIrrValue = '';
+        if (globalRowIndex < controller.grossIrrigationValues.length) {
+          grossIrrValue = controller.grossIrrigationValues[globalRowIndex];
         }
         rows.add(
           Container(
@@ -370,8 +405,37 @@ class CropWaterRequirementView extends GetView<CropWaterRequirementController> {
                 Expanded(
                   child: Container(
                     height: 32.0,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: Colors.grey, width: 0.5),
+                      ),
+                    ),
+                    padding: EdgeInsets.all(4.0),
+                    child: Text(
+                      globalRowIndex < controller.depletionEndValues.length
+                          ? controller.depletionEndValues[globalRowIndex].toStringAsFixed(3)
+                          : '',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    height: 32.0,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: Colors.grey, width: 0.5),
+                      ),
+                    ),
                     padding: EdgeInsets.all(4.0),
                     child: Text(irrValue, textAlign: TextAlign.center),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    height: 32.0,
+                    padding: EdgeInsets.all(4.0),
+                    child: Text(grossIrrValue, textAlign: TextAlign.center),
                   ),
                 ),
               ],
