@@ -1,5 +1,5 @@
+import 'package:crop_wat/climate/model/daily_climate_helper.dart';
 import 'package:get/get.dart';
-import '../../global_data_store.dart';
 import '../../crop/controller/crop_controller.dart';
 import '../../soil/controller/soil_controller.dart';
 import '../../climate/controller/climate_controller.dart';
@@ -20,7 +20,11 @@ class CropWaterRequirementController extends GetxController {
   var kcCoefValues = <double>[].obs;
   var rainValues = <String>[].obs;
   var effectiveRainValues = <String>[].obs; // Peff (mm/day)
-  var irrValues = <String>[].obs; // IRR (mm/day) = ETc - Peff
+  var netIrrigationValues = <String>[].obs; // IRR (mm/day) = ETc - Peff
+  var grossIrrigationValues = <String>[].obs; // Gross irrigation depth (mm/day)
+  var tawValues = <double>[].obs; // TAW (mm) for each stage
+  var rawValues = <double>[].obs; // RAW (mm) for each stage (RAW = TAW / 2)
+  var depletionEndValues = <double>[].obs; // Depletion End (mm) for each row
 
   @override
   void onInit() {
@@ -30,9 +34,8 @@ class CropWaterRequirementController extends GetxController {
     // Listen to changes in crop controller
     ever(cropController.cropName, (_) => _assignValues());
     ever(cropController.selectedDate, (_) => _assignValues());
-
-    // Listen to changes in global data store
-    ever(GlobalDataStore.cropStageData.obs, (_) => _assignValues());
+    ever(cropController.cropData, (_) => _assignValues());
+    ever(cropController.isDataLoaded, (_) => _assignValues());
 
     // Listen to changes in soil controller
     ever(soilController.soilData, (_) => _assignValues());
@@ -41,14 +44,16 @@ class CropWaterRequirementController extends GetxController {
   void _assignValues() {
     cropName.value = cropController.cropName.value;
     plantingDate.value = cropController.selectedDate.value;
-    cropStageData.assignAll(GlobalDataStore.cropStageData);
+    cropStageData.assignAll(cropController.cropData);
     _calculateStageRowCounts();
     _calculateRowDates();
     _calculateKcCoefValues();
     _calculateEtoValues();
     _calculateRainValues();
     _calculateEffectiveRainValues();
-    _calculateIrrValues();
+    _calculateTawValues();
+    _calculateRawValues();
+    _calculateDepletionEndValues();
   }
 
   // Calculate rows for each stage based on cumulative duration
@@ -116,33 +121,19 @@ class CropWaterRequirementController extends GetxController {
 
   // Get ETo value for a specific date
   double _getEtoForDate(DateTime date) {
-    // Find the month for the given date
-    String monthName = _getMonthName(date.month);
-
-    // Find the climate row for this month
-    for (var climateRow in climateController.climateRows) {
-      if (climateRow.month.toLowerCase() == monthName.toLowerCase()) {
-        // Calculate day of year (J value)
-        int dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays + 1;
-
-        // Use the climate data to calculate ETo for this specific day
-        if (climateRow.values.length >= 5) {
-          return _calculateEtoForDay(climateRow.values, dayOfYear);
-        }
-      }
+    int dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays + 1;
+    var dailyClimateValues = DailyClimateHelper.dailyClimateData[dayOfYear];
+    if (dailyClimateValues != null) {
+      return _calculateEtoForDay(dailyClimateValues, dayOfYear);
     }
-
-    return 0.0; // Default value if no climate data found
+    else {
+      return 0;
+    }
   }
 
   // Calculate ETo for a specific day using climate data
   double _calculateEtoForDay(List<double> climateValues, int dayOfYear) {
     // Extract climate data
-    double Tmin = climateValues[0]; // Min Temperature
-    double Tmax = climateValues[1]; // Max Temperature
-    double RH = climateValues[2]; // Relative Humidity
-    double u2 = climateValues[3]; // Wind Speed (km/day)
-    double Rs = climateValues[4]; // Solar Radiation (MJ/m²/hrs)
 
     // Call the climate controller's calculateETo method with the specific day
     String etoString = climateController.calculateETo(
@@ -281,39 +272,117 @@ class CropWaterRequirementController extends GetxController {
     effectiveRainValues.assignAll(peffPerDayList);
   }
 
-  // Calculate IRR (mm/day) = ETc (mm/day) - Effective rainfall (mm/day)
-  void _calculateIrrValues() {
-    final List<String> irrList = [];
 
-    final int n = rowDates.length;
-    for (int i = 0; i < n; i++) {
-      final double etc = i < etoValues.length ? etoValues[i] : 0.0;
-      final double peff = i < effectiveRainValues.length
-          ? double.tryParse(effectiveRainValues[i]) ?? 0.0
-          : 0.0;
-      final double irr = etc - peff;
-      irrList.add(irr.toStringAsFixed(2));
+  // Calculate TAW (Total Available Water) for each stage
+  void _calculateTawValues() {
+    List<double> tawList = [];
+
+    if (cropStageData.isEmpty || soilController.soilData.value == null) {
+      tawValues.assignAll(tawList);
+      return;
     }
 
-    irrValues.assignAll(irrList);
+    final soilData = soilController.soilData.value!;
+    final fieldCapacity = soilData.fieldCapacity;
+    final wiltingPoint = soilData.wiltingPoint;
+
+    for (int stageIndex = 0; stageIndex < cropStageData.length; stageIndex++) {
+      final stageData = cropStageData[stageIndex];
+      final rootzoneDepth = stageData.rootzoneDepth * 10;
+      
+      // Calculate TAW using the formula: (fieldCapacity - wiltingPoint) * rootzoneDepth * 1.45 / 100
+      // fieldCapacity and wiltingPoint are in %, rootzoneDepth is in cm
+      // Result is in mm
+      final taw = (fieldCapacity - wiltingPoint) * rootzoneDepth * 1.45 / 100;
+      
+      // Add TAW value for each row in this stage
+      int rowCount = stageRowCounts.length > stageIndex ? stageRowCounts[stageIndex] : 4;
+      for (int i = 0; i < rowCount; i++) {
+        tawList.add(taw);
+      }
+    }
+
+    tawValues.assignAll(tawList);
   }
 
-  // Get month name from month number
-  String _getMonthName(int month) {
-    const List<String> months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return months[month - 1];
+  // Get TAW value for a specific stage
+  double getTawForStage(String stageName) {
+    if (cropStageData.isEmpty || soilController.soilData.value == null) {
+      return 0.0;
+    }
+
+    final stageIndex = cropStageData.indexWhere((stage) => stage.stage == stageName);
+    if (stageIndex == -1) return 0.0;
+
+    final stageData = cropStageData[stageIndex];
+    final soilData = soilController.soilData.value!;
+    
+    return (soilData.fieldCapacity - soilData.wiltingPoint) * stageData.rootzoneDepth * 1.45 / 100;
+  }
+
+  // Calculate RAW (Readily Available Water) values
+  void _calculateRawValues() {
+    List<double> rawList = [];
+
+    if (tawValues.isEmpty) {
+      rawValues.assignAll(rawList);
+      return;
+    }
+
+    // Calculate RAW as TAW / 2 for each value
+    for (double taw in tawValues) {
+      rawList.add(taw / 2);
+    }
+
+    rawValues.assignAll(rawList);
+  }
+
+  // Calculate Depletion End values
+  void _calculateDepletionEndValues() {
+    List<double> depletionList = [];
+    List<String> netIrrigationList =[];
+    List<String> grossIrrigationList =[];
+
+    if (etoValues.isEmpty || rawValues.isEmpty) {
+      depletionEndValues.assignAll(depletionList);
+      return;
+    }
+
+    for (int i = 0; i < etoValues.length; i++) {
+      double depletionValue;
+      double netIrrigationvalue;
+      
+      if (i == 0) {
+        // First value is always 0
+        depletionValue = 0.0;
+        netIrrigationvalue = rawValues[i];
+      } else {
+        // Next value = etc value in same row + previous row depletion end
+        double etcValue = etoValues[i];
+        double previousDepletion = depletionList[i - 1];
+        double rawValue = i < rawValues.length ? rawValues[i] : 0.0;
+        
+        depletionValue = etcValue + previousDepletion;
+        
+        // If previous row depletion end is greater than RAW of the same row, 
+        // take value of Kc coef column value in same row
+        if (previousDepletion > rawValue) {
+          depletionValue = etcValue;
+          netIrrigationvalue = previousDepletion;
+        }
+        else{
+          netIrrigationvalue =0;
+        }
+      }
+      
+      depletionList.add(depletionValue);
+      netIrrigationList.add(netIrrigationvalue > 0 ? netIrrigationvalue.toStringAsFixed(2)  : "");
+      grossIrrigationList.add(netIrrigationvalue > 0 ? (netIrrigationvalue / 0.7).toStringAsFixed(2) : "");
+    }
+
+    depletionEndValues.assignAll(depletionList);
+    netIrrigationValues.assignAll(netIrrigationList);
+    grossIrrigationValues.assignAll(grossIrrigationList);
+
   }
 }

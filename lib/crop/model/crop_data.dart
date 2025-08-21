@@ -5,6 +5,7 @@ class CropStageData {
   final double? kcValue;
   final double kcbValue;
   final double? kc;
+  final double? rootzoneDepth;
 
   CropStageData({
     required this.stage,
@@ -12,6 +13,6 @@ class CropStageData {
     required this.cropHeight,
     required this.kcbValue,
     this.kcValue,
-    this.kc,
+    this.kc, required this.rootzoneDepth,
   });
 } 
