@@ -458,9 +458,7 @@ class CropController extends GetxController {
         (0.04 * (u2 - 2) - 0.004 * (rhMin - 45)) *
         pow(((cropHeight / 100.0) / 3), 0.3);
     var kcb = kcbTab + adjustment;
-    var kcMin =
-        (1.2 + (0.04 * (u2 - 2) - 0.004 * (rhMin - 45))) *
-        pow(((cropHeight / 100.0) / 3), 0.3);
+    var kcMin = 1.2 + (0.04 * (u2 - 2) - 0.004 * (rhMin - 45)) * pow((cropHeight / 3), 0.3);
     var kcMax = max(kcMin, kcb + 0.05);
 
     return double.parse(kcMax.toStringAsFixed(3));
@@ -548,7 +546,7 @@ class CropController extends GetxController {
             }
             if (isMatch) {
               duration = int.tryParse(row[1].trim()) ?? 0;
-              cropHeight = double.tryParse(row[2].trim()) ?? 0.0;
+              cropHeight = (double.tryParse(row[2].trim()) ?? 0.0) / 100;
               rootzoneDepth = double.tryParse(row[4].trim()) ?? 0.0;
 
               // Get kcb value from the kcb column if it exists
